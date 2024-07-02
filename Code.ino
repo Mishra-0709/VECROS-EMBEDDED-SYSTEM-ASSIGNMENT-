@@ -1,0 +1,124 @@
+#include <Wire.h>
+#include <Adafruit_INA219.h>
+#include <Adafruit_SSD1306.h>
+#include <HX711.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <SPI.h>
+#include <EEPROM_AT25.h>
+
+// Pin Definitions
+#define VOLTAGE_SENSOR_ADDR 0x40
+#define CURRENT_SENSOR_PIN 34
+#define HX711_SCK 32
+#define HX711_DT 33
+#define RPM_SENSOR_PIN 25
+#define TEMP_SENSOR_PIN 26
+#define OLED_RESET -1
+
+// EEPROM Pins
+#define EEPROM_CS 5
+
+// INA219 Voltage Sensor
+Adafruit_INA219 ina219;
+
+// HX711 Load Cell
+HX711 scale;
+
+// DS18B20 Temperature Sensor
+OneWire oneWire(TEMP_SENSOR_PIN);
+DallasTemperature sensors(&oneWire);
+
+// OLED Display (128x64)
+Adafruit_SSD1306 display(128, 64, &Wire, OLED_RESET);
+
+// AT25 EEPROM
+EEPROM_AT25 eeprom(EEPROM_CS);
+
+void setup() {
+  // Initialize Serial Monitor
+  Serial.begin(115200);
+
+  // Initialize INA219 Voltage Sensor
+  if (!ina219.begin(VOLTAGE_SENSOR_ADDR)) {
+    Serial.println("Failed to find INA219 chip");
+    while (1);
+  }
+
+  // Initialize HX711 Load Cell
+  scale.begin(HX711_DT, HX711_SCK);
+
+  // Initialize DS18B20 Temperature Sensor
+  sensors.begin();
+
+  // Initialize OLED Display
+  if (!display.begin(SSD1306_I2C_ADDRESS, OLED_RESET)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;);
+  }
+  display.display();
+  delay(2000);
+  display.clearDisplay();
+
+  // Initialize SPI and EEPROM
+  SPI.begin();
+  if (!eeprom.begin()) {
+    Serial.println("Failed to initialize EEPROM");
+    while (1);
+  }
+}
+
+void loop() {
+  // Read Voltage
+  float busVoltage = ina219.getBusVoltage_V();
+  float current_mA = ina219.getCurrent_mA();
+  
+  // Read Current (ACS712)
+  int currentValue = analogRead(CURRENT_SENSOR_PIN);
+  float current_A = (currentValue - 512) * (5.0 / 1024.0) * 30.0; // Adjust for ACS712-30A
+  
+  // Read Load Cell (Thrust)
+  float thrust = scale.get_units(10);
+
+  // Read Temperature
+  sensors.requestTemperatures();
+  float temperature = sensors.getTempCByIndex(0);
+
+  // Read RPM (Placeholder - requires implementation)
+  int rpm = digitalRead(RPM_SENSOR_PIN); // Implement RPM calculation logic
+
+  // Store data in EEPROM
+  int addr = 0;
+  eeprom.writeFloat(addr, busVoltage);
+  addr += sizeof(float);
+  eeprom.writeFloat(addr, current_A);
+  addr += sizeof(float);
+  eeprom.writeFloat(addr, thrust);
+  addr += sizeof(float);
+  eeprom.writeFloat(addr, temperature);
+  addr += sizeof(float);
+  eeprom.writeInt(addr, rpm);
+  addr += sizeof(int);
+
+  // Display data on OLED
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.print("Voltage: "); display.print(busVoltage); display.println(" V");
+  display.print("Current: "); display.print(current_A); display.println(" A");
+  display.print("Thrust: "); display.print(thrust); display.println(" kg");
+  display.print("Temp: "); display.print(temperature); display.println(" C");
+  display.print("RPM: "); display.print(rpm);
+  display.display();
+
+  // Print data to Serial Monitor
+  Serial.print("Voltage: "); Serial.print(busVoltage); Serial.println(" V");
+  Serial.print("Current: "); Serial.print(current_A); Serial.println(" A");
+  Serial.print("Thrust: "); Serial.print(thrust); Serial.println(" kg");
+  Serial.print("Temp: "); Serial.print(temperature); Serial.println(" C");
+  Serial.print("RPM: "); Serial.println(rpm);
+
+  // Wait before next reading
+  delay(1000);
+}
