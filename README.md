@@ -36,11 +36,6 @@ This project aims to design an electronic system for a thrust stand that measure
     - All connections are clear and appropriately labeled.
     - Schematic design is provided in PDF format.
 
-## Deadline
-
-- The project should be submitted within 24 hours.
-- Submit whatever you can complete within the given timeline.
-
 ## Files
 
 - **Schematic Diagram:** [Schematic.pdf](https://github.com/user-attachments/files/16070839/Schematic.pdf)
